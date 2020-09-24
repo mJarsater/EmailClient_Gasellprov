@@ -7,7 +7,7 @@ public class EmailClient extends JFrame  {
     private JPasswordField passwordField;
     private JTextField usernameField, fromField, toField, subjectField;
     private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel;
-    private JButton signInOutBtn, sendBtn, attachBtn;
+    private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn;
     private String username, password;
     private JTextArea messeageArea, inboxArea;
     private Session session;
@@ -27,7 +27,7 @@ public class EmailClient extends JFrame  {
         signInOutBtn.setBounds(200, 5, 100, 45);
         signInOutBtn.addActionListener(this:: signInOutListner);
 
-
+        //-----------------SEND AREA--------------------------
         sendBtn = new JButton("Send");
         sendBtn.setBounds(200, 100, 100, 30);
         sendBtn.setEnabled(false);
@@ -50,10 +50,21 @@ public class EmailClient extends JFrame  {
         subjectField.setBounds(80, 150, 100, 20);
         subjectLabel.setBounds(5, 150, 100,20);
         messeageArea = new JTextArea();
-        messeageArea.setBounds(5, 180, 300,350);
+        messeageArea.setBounds(5, 180, 400,350);
         messeageArea.setEnabled(false);
+        //-----------------SEND AREA END----------------------
 
+
+        //-----------------INBOX AREA--------------------------
+
+        refreshBtn = new JButton("Refresh");
+        refreshBtn.setEnabled(false);
+        refreshBtn.setBounds(550, 100, 100, 45);
         inboxArea = new JTextArea();
+        inboxArea.setBounds(410,180,400, 350);
+
+        //-----------------INBOX AREA END----------------------
+
 
 
         this.add(signInOutBtn);
@@ -70,6 +81,9 @@ public class EmailClient extends JFrame  {
         this.add(subjectField);
         this.add(subjectLabel);
         this.add(messeageArea);
+
+        this.add(refreshBtn);
+        this.add(inboxArea);
         this.setTitle("Martin Jarsäters Email-klient");
         this.setLayout(null);
         this.setSize(900, 580);
@@ -129,7 +143,7 @@ public class EmailClient extends JFrame  {
             });
             toggleSignInOut();
             enableEmail();
-            EmailReciver emailReciver = new EmailReciver();
+            EmailReciver emailReciver = new EmailReciver(this);
             emailReciver.run();
         } else {
         toggleSignInOut();
@@ -145,10 +159,10 @@ public class EmailClient extends JFrame  {
 
 class EmailReciver extends Thread{
     private boolean alive = true;
+    private EmailClient emailClient;
 
-
-    public EmailReciver(){
-
+    public EmailReciver(EmailClient emailClient){
+        this.emailClient = emailClient;
     }
 
     public void start(){
