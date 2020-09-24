@@ -3,14 +3,15 @@ import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.util.Properties;
 
-public class EmailClient extends JFrame {
+public class EmailClient extends JFrame  {
     private JPasswordField passwordField;
     private JTextField usernameField, fromField, toField, subjectField;
     private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel;
-    private JButton signInOutBtn;
+    private JButton signInOutBtn, sendBtn, attachBtn;
     private String username, password;
     private JTextArea messeageArea, inboxArea;
     private Session session;
+    private boolean signedIn = false;
 
 
     public EmailClient(){
@@ -27,21 +28,29 @@ public class EmailClient extends JFrame {
         signInOutBtn.addActionListener(this:: signInOutListner);
 
 
+        sendBtn = new JButton("Send");
+        sendBtn.setBounds(200, 100, 100, 30);
+        sendBtn.setEnabled(false);
+        attachBtn = new JButton("Attachment");
+        attachBtn.setBounds(200, 135, 100, 30);
+        attachBtn.setEnabled(false);
         fromField = new JTextField();
         fromLabel = new JLabel("From:");
-        fromLabel.setBounds(5,200,50, 20);
-        fromField.setBounds(50, 200, 100, 20);
+        fromLabel.setBounds(5,100,50, 20);
+        fromField.setBounds(80, 100, 100, 20);
         fromField.setEnabled(false);
         toField = new JTextField();
+        toField.setEnabled(false);
         toLabel = new JLabel("To:");
-        toLabel.setBounds(5, 225, 100,20);
-        toField.setBounds(50, 225, 100,20);
+        toLabel.setBounds(5, 125, 100,20);
+        toField.setBounds(80, 125, 100,20);
         subjectField = new JTextField();
+        subjectField.setEnabled(false);
         subjectLabel = new JLabel("Subject:");
-        subjectField.setBounds(50, 250, 100, 20);
-        subjectLabel.setBounds(5, 250, 100,20);
+        subjectField.setBounds(80, 150, 100, 20);
+        subjectLabel.setBounds(5, 150, 100,20);
         messeageArea = new JTextArea();
-        messeageArea.setBounds(5, 280, 300,370);
+        messeageArea.setBounds(5, 180, 300,350);
         messeageArea.setEnabled(false);
 
         inboxArea = new JTextArea();
@@ -52,6 +61,8 @@ public class EmailClient extends JFrame {
         this.add(usernameField);
         this.add(passwordLabel);
         this.add(passwordField);
+        this.add(sendBtn);
+        this.add(attachBtn);
         this.add(fromField);
         this.add(fromLabel);
         this.add(toField);
@@ -61,11 +72,10 @@ public class EmailClient extends JFrame {
         this.add(messeageArea);
         this.setTitle("Martin Jarsäters Email-klient");
         this.setLayout(null);
-        this.setSize(900, 700);
+        this.setSize(900, 580);
         this.setVisible(true);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
-
 
 
     public void getCredentials(){
@@ -78,15 +88,32 @@ public class EmailClient extends JFrame {
                 usernameField.setEnabled(false);
                 passwordField.setEnabled(false);
                 signInOutBtn.setText("Sign out");
+                fromField.setText(username);
             } else if (signInOutBtn.getText().equalsIgnoreCase("Sign out")) {
                 usernameField.setEnabled(true);
                 passwordField.setEnabled(true);
+                fromField.setText("");
                 signInOutBtn.setText("Sign in");
         } else{
             System.out.println("No input");
         }
     }
 
+    public void enableEmail(){
+        sendBtn.setEnabled(true);
+        attachBtn.setEnabled(true);
+        toField.setEnabled(true);
+        subjectField.setEnabled(true);
+        messeageArea.setEnabled(true);
+
+    }
+    public void disableEmail(){
+        sendBtn.setEnabled(false);
+        attachBtn.setEnabled(false);
+        toField.setEnabled(false);
+        subjectField.setEnabled(false);
+        messeageArea.setEnabled(false);
+    }
 
 
     public void signInOutListner(ActionEvent e) {
@@ -100,17 +127,47 @@ public class EmailClient extends JFrame {
                     return new PasswordAuthentication(username, password);
                 }
             });
-
             toggleSignInOut();
+            enableEmail();
+            EmailReciver emailReciver = new EmailReciver();
+            emailReciver.run();
         } else {
-
-        //TODO - Ta bort info
         toggleSignInOut();
+        disableEmail();
     }
     }
-
         public static void main(String[] args) {
         EmailClient emailClient = new EmailClient();
+
     }
 
+}
+
+class EmailReciver extends Thread{
+    private boolean alive = true;
+
+
+    public EmailReciver(){
+
+    }
+
+    public void start(){
+        while(alive) {
+            try {
+                sleep(30000);
+                //Hämta email
+                fetchEmails();
+            } catch (InterruptedException ie){
+                System.out.println(ie);
+            }
+        }
+    }
+
+    public void fetchEmails(){
+
+    }
+
+    public void kill(){
+        alive = false;
+    }
 }
