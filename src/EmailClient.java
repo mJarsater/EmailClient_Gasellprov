@@ -1,15 +1,12 @@
-import com.sun.jdi.connect.Connector;
 import org.apache.commons.lang3.ArrayUtils;
 
-import javax.activation.DataHandler;
-import javax.activation.FileDataSource;
 import javax.mail.*;
 import javax.mail.internet.*;
-import javax.sql.DataSource;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.Properties;
 
@@ -19,11 +16,13 @@ public class EmailClient extends JFrame  {
     private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel, unreadLabel, totalAmountLabel, statusLabel;
     private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn;
     private String username, password;
-    private JTextArea messeageArea, inboxArea;
-    private JScrollPane scrollPane;
+    private JTextArea messeageArea, readEmailArea;
+    private JScrollPane scrollPane, scrollReadEmail;
     private File selectedFile;
     private EmailReciver emailReciver;
     private Session session;
+    private DefaultListModel <Email> l1;
+    private JList<Email> inboxArea;
 
 
 
@@ -69,6 +68,9 @@ public class EmailClient extends JFrame  {
         messeageArea = new JTextArea();
         messeageArea.setBounds(5, 200, 400,330);
         messeageArea.setEnabled(false);
+
+
+
         //-----------------SEND AREA END----------------------
 
 
@@ -78,14 +80,24 @@ public class EmailClient extends JFrame  {
         refreshBtn.setEnabled(false);
         refreshBtn.addActionListener(this :: refreshListner);
         refreshBtn.setBounds(550, 100, 100, 45);
-        inboxArea = new JTextArea();
+        JButton readBtn = new JButton("Read");
+        readBtn.setEnabled(true);
+        readBtn.setBounds(810,225, 80, 50 );
+        readBtn.addActionListener(this::readListner);
+        l1 = new DefaultListModel<>();
+        inboxArea = new JList<>(l1);
         scrollPane = new JScrollPane(inboxArea);
-        scrollPane.setPreferredSize(new Dimension(500, 350));
-        scrollPane.setBounds(410,200,500, 330);
+        scrollPane.setPreferredSize(new Dimension(400, 100));
+        scrollPane.setBounds(410,200,400, 100);
         totalAmountLabel = new JLabel("Total amount of emails: -");
         totalAmountLabel.setBounds(450, 180, 200, 20);
         unreadLabel = new JLabel("Unread: -");
         unreadLabel.setBounds(650, 180, 150, 20);
+
+        readEmailArea = new JTextArea();
+        readEmailArea.setLineWrap(true);
+        scrollReadEmail = new JScrollPane(readEmailArea);
+        scrollReadEmail.setBounds(410, 310, 400, 220);
 
         //-----------------INBOX AREA END----------------------
 
@@ -106,7 +118,9 @@ public class EmailClient extends JFrame  {
         this.add(subjectLabel);
         this.add(statusLabel);
         this.add(messeageArea);
+        this.add(scrollReadEmail);
 
+        this.add(readBtn);
         this.add(refreshBtn);
         this.add(unreadLabel);
         this.add(totalAmountLabel);
@@ -151,7 +165,7 @@ public class EmailClient extends JFrame  {
         return unreadLabel;
     }
 
-    public JTextArea getInboxArea(){
+    public JList getInboxArea(){
         return inboxArea;
     }
 
@@ -195,7 +209,7 @@ public class EmailClient extends JFrame  {
                 }
             });
             //TODO - Funkar inte med brandväggen?
-            emailReciver = new EmailReciver(this, username, password);
+            emailReciver = new EmailReciver(this, username, password, l1);
             toggleSignInOut();
             enableEmail();
             refreshBtn.setEnabled(true);
@@ -217,6 +231,23 @@ public class EmailClient extends JFrame  {
 
     public void refreshListner(ActionEvent e){
         emailReciver.start();
+    }
+
+    public void readListner(ActionEvent e){
+            Email email = inboxArea.getSelectedValue();
+            writeEmail(email);
+
+
+    }
+
+    public void writeEmail(Email email){
+        readEmailArea.setText(null);
+
+        if(email.getAttachment() != null){
+            readEmailArea.append("Attachment: "+email.getAttachment() +"\n");
+        }
+            readEmailArea.append("\n"+ email.getMessage());
+
     }
 
 
@@ -331,23 +362,25 @@ class EmailSender extends Thread{
 class EmailReciver extends Thread{
     private boolean alive = true;
     private EmailClient emailClient;
-    private JTextArea inboxArea;
+    private JList inboxArea;
     private JLabel unreadLabel, totalAmountLabel;
     private int unreadCount, totalCount;
     private String username, password;
     private boolean signedIn = false;
+    private DefaultListModel <String> l1;
 
-    public EmailReciver(EmailClient emailClient, String username, String password){
+    public EmailReciver(EmailClient emailClient, String username, String password, DefaultListModel l1){
         this.emailClient = emailClient;
         this.inboxArea = emailClient.getInboxArea();
         this.unreadLabel = emailClient.getUnreadLabel();
         this.totalAmountLabel = emailClient.getTotalAmountLabel();
         this.username = username;
         this.password = password;
+        this.l1 = l1;
     }
 
     public void clearTextArea(){
-        inboxArea.setText(null);
+        inboxArea.removeAll();
     }
 
     public void setLabels(int unreadCount, int totalCount){
@@ -366,11 +399,11 @@ class EmailReciver extends Thread{
 
 
 
-    public void print(String msg){
+  /*  public void print(String msg){
         inboxArea.append(msg+ "\n");
     }
 
-    public void printEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles){
+    public void printFullEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles){
             inboxArea.append("\n");
             inboxArea.append("From: " +fromAddress+"\n");
             inboxArea.append("Subject: "+subject+"\n");
@@ -379,13 +412,19 @@ class EmailReciver extends Thread{
             inboxArea.append("Message: "+messageContent+"\n");
             inboxArea.append("------------------------------------");
             inboxArea.append("\n");
+    }*/
+
+
+
+    public void createEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles){
+        Email newEmail = new Email(fromAddress,subject,sentDate,attachFiles,messageContent, l1);
+        newEmail.add();
     }
-
-
 
 
     public void getEmailContent(Message msg) {
     try {
+
         String fromAddress = msg.getFrom()[0].toString();
         String subject = msg.getSubject();
         String sentDate = msg.getSentDate().toString();
@@ -402,7 +441,9 @@ class EmailReciver extends Thread{
              if(Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())){
                  String fileName = part.getFileName();
                  attachFiles += fileName +",";
-                 part.saveFile("C:\\"+File.separator + fileName);
+                 System.out.println("C:/temp/"+File.separator + fileName);
+                 part.saveFile("C:/temp/"+File.separator + fileName);
+
              } else{
                  messageContent = part.getContent().toString();
              }
@@ -416,8 +457,8 @@ class EmailReciver extends Thread{
                  messageContent = content.toString();
              }
             }
+         createEmail(fromAddress,subject,sentDate,messageContent, attachFiles);
 
-         printEmail(fromAddress,subject,sentDate,messageContent,attachFiles);
         }
     } catch (MessagingException me){
         me.printStackTrace();
@@ -462,11 +503,12 @@ class EmailReciver extends Thread{
                     break;
                 }
                 getEmailContent(messages[i]);
+
             }
 
         } catch (AuthenticationFailedException e){
-            print("Authentication failed");
-            print("Wrong email/password");
+            System.out.print("Authentication failed");
+            System.out.print("Wrong email/password");
         } catch (MessagingException me){
             System.out.println(me);
         }
@@ -478,5 +520,38 @@ class EmailReciver extends Thread{
 
     public void kill(){
         alive = false;
+    }
+}
+
+class Email {
+    private String from;
+    private String subject;
+    private String date;
+    private String attachment;
+    private String message;
+    private DefaultListModel <Email> l1;
+
+    public Email(String from, String subject, String date, String attachment, String message, DefaultListModel l1){
+        this.from = from;
+        this.subject = subject;
+        this.date = date;
+        this.attachment = attachment;
+        this.message = message;
+        this.l1 = l1;
+    }
+
+    public void add(){
+        l1.addElement(this);
+    }
+
+    public String getAttachment(){
+        return attachment;
+    }
+    public String getMessage(){
+        return message;
+    }
+
+    public String toString(){
+        return subject + " From:" +from;
     }
 }
