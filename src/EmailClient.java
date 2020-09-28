@@ -14,7 +14,7 @@ public class EmailClient extends JFrame  {
     private JPasswordField passwordField;
     private JTextField usernameField, fromField, toField, subjectField;
     private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel, unreadLabel, totalAmountLabel, statusLabel;
-    private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn;
+    private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn, readBtn, getAttachBtn;
     private String username, password;
     private JTextArea messeageArea, readEmailArea;
     private JScrollPane scrollPane, scrollReadEmail;
@@ -80,10 +80,15 @@ public class EmailClient extends JFrame  {
         refreshBtn.setEnabled(false);
         refreshBtn.addActionListener(this :: refreshListner);
         refreshBtn.setBounds(550, 100, 100, 45);
-        JButton readBtn = new JButton("Read");
-        readBtn.setEnabled(true);
-        readBtn.setBounds(810,225, 80, 50 );
+        readBtn = new JButton("Read");
+        readBtn.setEnabled(false);
+        readBtn.setBounds(820,225, 80, 50 );
         readBtn.addActionListener(this::readListner);
+
+        getAttachBtn = new JButton("Save attachment");
+        getAttachBtn.setEnabled(false);
+        getAttachBtn.addActionListener(this :: getAttachmentListner);
+        getAttachBtn.setBounds(820, 280, 80, 50);
         l1 = new DefaultListModel<>();
         inboxArea = new JList<>(l1);
         scrollPane = new JScrollPane(inboxArea);
@@ -121,6 +126,7 @@ public class EmailClient extends JFrame  {
         this.add(scrollReadEmail);
 
         this.add(readBtn);
+        this.add(getAttachBtn);
         this.add(refreshBtn);
         this.add(unreadLabel);
         this.add(totalAmountLabel);
@@ -175,6 +181,10 @@ public class EmailClient extends JFrame  {
         toField.setEnabled(true);
         subjectField.setEnabled(true);
         messeageArea.setEnabled(true);
+        readBtn.setEnabled(true);
+        getAttachBtn.setEnabled(true);
+        inboxArea.setEnabled(true);
+        readEmailArea.setEditable(true);
 
     }
 
@@ -184,6 +194,11 @@ public class EmailClient extends JFrame  {
         toField.setEnabled(false);
         subjectField.setEnabled(false);
         messeageArea.setEnabled(false);
+        readBtn.setEnabled(false);
+        getAttachBtn.setEnabled(false);
+        inboxArea.setEnabled(false);
+        readEmailArea.setText(null);
+        readEmailArea.setEditable(false);
     }
 
     public void clearEmailInput(){
@@ -240,14 +255,23 @@ public class EmailClient extends JFrame  {
 
     }
 
+    public void getAttachmentListner(ActionEvent e){
+        Email email = inboxArea.getSelectedValue();
+        String attachment = email.getAttachment();
+
+        //TODO - Spara filen
+    }
+
     public void writeEmail(Email email){
         readEmailArea.setText(null);
-
-        if(email.getAttachment() != null){
-            readEmailArea.append("Attachment: "+email.getAttachment() +"\n");
-        }
+        System.out.println(email.getAttachment());
+        if(email.getAttachment().equals("")){
+            readEmailArea.append("\n"+ email.getMessage());
+        } else {
+            readEmailArea.append("Attachment: " +email.getAttachment() + "\n");
             readEmailArea.append("\n"+ email.getMessage());
 
+        }
     }
 
 
@@ -441,8 +465,7 @@ class EmailReciver extends Thread{
              if(Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())){
                  String fileName = part.getFileName();
                  attachFiles += fileName +",";
-                 System.out.println("C:/temp/"+File.separator + fileName);
-                 part.saveFile("C:/temp/"+File.separator + fileName);
+
 
              } else{
                  messageContent = part.getContent().toString();
@@ -499,7 +522,7 @@ class EmailReciver extends Thread{
 
 
             for(int i = 0; i < messages.length; i++){
-                if(i >= 10){
+                if(i > 10){
                     break;
                 }
                 getEmailContent(messages[i]);
@@ -545,7 +568,7 @@ class Email {
     }
 
     public String getAttachment(){
-        return attachment;
+        return attachment.trim();
     }
     public String getMessage(){
         return message;

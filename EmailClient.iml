@@ -9,7 +9,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="apidocs" level="project" />
     <orderEntry type="library" name="activation" level="project" />
+    <orderEntry type="library" name="javax.mail" level="project" />
     <orderEntry type="library" name="commons-lang3-3.11" level="project" />
-    <orderEntry type="library" name="jsoup-1.13.1 (1)" level="project" />
   </component>
 </module>

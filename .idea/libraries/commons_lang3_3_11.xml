@@ -1,7 +1,7 @@
 <component name="libraryTable">
   <library name="commons-lang3-3.11">
     <CLASSES>
-      <root url="jar://M:/Downloads/commons-lang3-3.11-bin/commons-lang3-3.11/commons-lang3-3.11.jar!/" />
+      <root url="jar://$USER_HOME$/Downloads/commons-lang3-3.11/commons-lang3-3.11.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
