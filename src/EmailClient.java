@@ -1,17 +1,22 @@
+import org.apache.commons.lang3.ArrayUtils;
+
 import javax.mail.*;
 import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.util.Properties;
 
 public class EmailClient extends JFrame  {
     private JPasswordField passwordField;
     private JTextField usernameField, fromField, toField, subjectField;
-    private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel;
+    private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel, unreadLabel, totalAmountLabel;
     private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn;
     private String username, password;
     private JTextArea messeageArea, inboxArea;
+    private JScrollPane scrollPane;
+    private EmailReciver emailReciver;
     private Session session;
-    private boolean signedIn = false;
+
 
 
     public EmailClient(){
@@ -59,9 +64,16 @@ public class EmailClient extends JFrame  {
 
         refreshBtn = new JButton("Refresh");
         refreshBtn.setEnabled(false);
+        refreshBtn.addActionListener(this :: refreshListner);
         refreshBtn.setBounds(550, 100, 100, 45);
         inboxArea = new JTextArea();
-        inboxArea.setBounds(410,180,400, 350);
+        scrollPane = new JScrollPane(inboxArea);
+        scrollPane.setPreferredSize(new Dimension(400, 350));
+        scrollPane.setBounds(410,180,400, 350);
+        totalAmountLabel = new JLabel("Total amount of emails: -");
+        totalAmountLabel.setBounds(450, 150, 150, 20);
+        unreadLabel = new JLabel("Unread: -");
+        unreadLabel.setBounds(650, 150, 150, 20);
 
         //-----------------INBOX AREA END----------------------
 
@@ -83,10 +95,12 @@ public class EmailClient extends JFrame  {
         this.add(messeageArea);
 
         this.add(refreshBtn);
-        this.add(inboxArea);
+        this.add(unreadLabel);
+        this.add(totalAmountLabel);
+        this.add(scrollPane);
         this.setTitle("Martin Jarsäters Email-klient");
         this.setLayout(null);
-        this.setSize(inboxArea.getX() + 420, 580);
+        this.setSize(scrollPane.getX() + 420, 580);
         this.setVisible(true);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
@@ -113,7 +127,15 @@ public class EmailClient extends JFrame  {
         }
     }
 
-    public JTextArea getTextArea(){
+    public JLabel getTotalAmountLabel(){
+        return totalAmountLabel;
+    }
+
+    public JLabel getUnreadLabel(){
+        return unreadLabel;
+    }
+
+    public JTextArea getInboxArea(){
         return inboxArea;
     }
 
@@ -125,6 +147,7 @@ public class EmailClient extends JFrame  {
         messeageArea.setEnabled(true);
 
     }
+
     public void disableEmail(){
         sendBtn.setEnabled(false);
         attachBtn.setEnabled(false);
@@ -132,7 +155,6 @@ public class EmailClient extends JFrame  {
         subjectField.setEnabled(false);
         messeageArea.setEnabled(false);
     }
-
 
     public void signInOutListner(ActionEvent e) {
         if(signInOutBtn.getText().equals("Sign in")) {
@@ -145,18 +167,24 @@ public class EmailClient extends JFrame  {
                     return new PasswordAuthentication(username, password);
                 }
             });
+            // emailReciver = new EmailReciver(this, username, password); TODO - Funkar inte med brandväggen?
+            // emailReciver.start();
             toggleSignInOut();
             enableEmail();
-            EmailReciver emailReciver = new EmailReciver(this);
-            emailReciver.run();
+            refreshBtn.setEnabled(true);
         } else {
         toggleSignInOut();
         disableEmail();
     }
     }
+
         public static void main(String[] args) {
         EmailClient emailClient = new EmailClient();
 
+    }
+
+    public void refreshListner(ActionEvent e){
+        emailReciver.start();
     }
 
 }
@@ -164,25 +192,102 @@ public class EmailClient extends JFrame  {
 class EmailReciver extends Thread{
     private boolean alive = true;
     private EmailClient emailClient;
+    private JTextArea inboxArea;
+    private JLabel unreadLabel, totalAmountLabel;
+    private int unreadCount, totalCount;
+    private String username, password;
+    private boolean signedIn = false;
 
-    public EmailReciver(EmailClient emailClient){
+    public EmailReciver(EmailClient emailClient, String username, String password){
         this.emailClient = emailClient;
+        this.inboxArea = emailClient.getInboxArea();
+        this.unreadLabel = emailClient.getUnreadLabel();
+        this.totalAmountLabel = emailClient.getTotalAmountLabel();
+        this.username = username;
+        this.password = password;
     }
 
+    public void clearTextArea(){
+        inboxArea.setText(null);
+    }
+
+    public void setLabels(int unreadCount, int totalCount){
+        unreadLabel.setText("Unread: "+unreadCount);
+        totalAmountLabel.setText("Total amount of emails: "+totalCount);
+    }
+
+
     public void start(){
-        while(alive) {
-            try {
-                sleep(30000);
-                //Hämta email
+                System.out.println("Clearin");
+                clearTextArea();
+                System.out.println("Fetching");
                 fetchEmails();
-            } catch (InterruptedException ie){
-                System.out.println(ie);
-            }
+        }
+
+
+
+
+    public void print(String msg){
+        inboxArea.append(msg+ "\n");
+    }
+
+    public void printEmail(Message msg){
+        try{
+            inboxArea.append("\n");
+            inboxArea.append("From: " +msg.getFrom()[0]+"\n");
+            inboxArea.append("Subject: "+msg.getSubject()+"\n");
+            inboxArea.append("Date: "+msg.getSentDate()+"\n");
+            inboxArea.append("------------------------------------");
+            inboxArea.append("\n");
+    } catch (MessagingException me){
+            print("Ooops.. something went wrong, please try again.");
         }
     }
 
-    public void fetchEmails(){
+    public synchronized void fetchEmails(){
+        try{
+            Properties properties = new Properties();
+            properties.put("mail.smtp.host", "smtp-mail.outlook.com");
+            Session session = Session.getInstance(properties, new Authenticator() {
+                @Override
+                protected PasswordAuthentication getPasswordAuthentication() {
+                    return new PasswordAuthentication(username, password);
+                }
+            });
+            Store emailStore = session.getStore("imaps");
+            System.out.println("Connecting");
+            emailStore.connect("smtp-mail.outlook.com", username, password);
 
+
+            System.out.println("Opening folder");
+            Folder inbox = emailStore.getFolder("INBOX");
+            unreadCount = inbox.getUnreadMessageCount();
+            totalCount = inbox.getMessageCount();
+            setLabels(unreadCount, totalCount);
+
+            inbox.open(Folder.READ_ONLY);
+
+            Message [] messages = inbox.getMessages();
+            ArrayUtils.reverse(messages);
+            clearTextArea();
+            for(int i = 0; i < messages.length; i++){
+                if(i >= 10){
+                    inbox.close();
+                    emailStore.close();
+                }
+                printEmail(messages[i]);
+            }
+
+        } catch (AuthenticationFailedException e){
+            print("Authentication failed");
+            print("Wrong email/password");
+        } catch (MessagingException me){
+            System.out.println(me);
+        }
+    }
+
+    public boolean isSignedIn() {
+        return signedIn;
     }
 
     public void kill(){
