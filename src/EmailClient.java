@@ -86,7 +86,7 @@ public class EmailClient extends JFrame  {
         this.add(inboxArea);
         this.setTitle("Martin Jarsäters Email-klient");
         this.setLayout(null);
-        this.setSize(900, 580);
+        this.setSize(inboxArea.getX() + 420, 580);
         this.setVisible(true);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
@@ -111,6 +111,10 @@ public class EmailClient extends JFrame  {
         } else{
             System.out.println("No input");
         }
+    }
+
+    public JTextArea getTextArea(){
+        return inboxArea;
     }
 
     public void enableEmail(){
