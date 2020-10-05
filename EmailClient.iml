@@ -8,8 +8,8 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="apidocs" level="project" />
-    <orderEntry type="library" name="activation" level="project" />
-    <orderEntry type="library" name="commons-lang3-3.11" level="project" />
-    <orderEntry type="library" name="jsoup-1.13.1" level="project" />
+    <orderEntry type="library" exported="" name="activation" level="project" />
+    <orderEntry type="library" exported="" name="commons-lang3-3.11" level="project" />
+    <orderEntry type="library" exported="" name="jsoup-1.13.1" level="project" />
   </component>
 </module>
