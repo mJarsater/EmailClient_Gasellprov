@@ -6,14 +6,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.*;
-import java.nio.charset.Charset;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Properties;
 
 public class EmailClient extends JFrame  {
     private JPasswordField passwordField;
     private JTextField usernameField, fromField, toField, subjectField;
-    private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel, unreadLabel, totalAmountLabel, statusLabel;
+    private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel,attachmentLabel, unreadLabel, totalAmountLabel, sentStatusLabel, downloadStatusLabel;
     private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn, readBtn, getAttachBtn;
     private String username, password;
     private JTextArea messeageArea, readEmailArea;
@@ -23,6 +24,7 @@ public class EmailClient extends JFrame  {
     private Session session;
     private DefaultListModel <Email> l1;
     private JList<Email> inboxArea;
+    private ArrayList<File> attachmentsList = new ArrayList<>();
 
 
 
@@ -61,43 +63,57 @@ public class EmailClient extends JFrame  {
         subjectField = new JTextField();
         subjectField.setEnabled(false);
         subjectLabel = new JLabel("Subject:");
+
+        attachmentLabel = new JLabel("Attachment: ");
+        attachmentLabel.setBounds(5, 175, 400, 20);
         subjectField.setBounds(80, 150, 100, 20);
         subjectLabel.setBounds(5, 150, 100,20);
-        statusLabel = new JLabel("Status: -");
-        statusLabel.setBounds(105, 180, 150, 20);
         messeageArea = new JTextArea();
         messeageArea.setBounds(5, 200, 400,330);
         messeageArea.setEnabled(false);
 
 
 
-        //-----------------SEND AREA END----------------------
+        //-----------------SEND AREA END-----------------------
 
+        //-----------------LABEL AREA--------------------------
+
+        totalAmountLabel = new JLabel("Total amount of emails: -");
+        totalAmountLabel.setBounds(650, 10, 200, 20);
+        unreadLabel = new JLabel("Unread: -");
+        unreadLabel.setBounds(650, 40, 150, 20);
+        downloadStatusLabel = new JLabel("Download status: -");
+        downloadStatusLabel.setBounds(410,10,200,20);
+        sentStatusLabel = new JLabel("Sending status: -");
+        sentStatusLabel.setBounds(410, 40, 150, 20);
+
+
+        //-----------------LABEL AREA END----------------------
 
         //-----------------INBOX AREA--------------------------
 
         refreshBtn = new JButton("Refresh");
         refreshBtn.setEnabled(false);
         refreshBtn.addActionListener(this :: refreshListner);
-        refreshBtn.setBounds(550, 100, 100, 45);
+        refreshBtn.setBounds(410, 125, 130, 45);
+
         readBtn = new JButton("Read");
         readBtn.setEnabled(false);
-        readBtn.setBounds(820,225, 80, 50 );
+        readBtn.setBounds(545,125, 130, 45 );
         readBtn.addActionListener(this::readListner);
 
         getAttachBtn = new JButton("Save attachment");
         getAttachBtn.setEnabled(false);
         getAttachBtn.addActionListener(this :: getAttachmentListner);
-        getAttachBtn.setBounds(820, 280, 80, 50);
+        getAttachBtn.setBounds(680, 125, 130, 45);
+
         l1 = new DefaultListModel<>();
         inboxArea = new JList<>(l1);
         scrollPane = new JScrollPane(inboxArea);
-        scrollPane.setPreferredSize(new Dimension(400, 100));
-        scrollPane.setBounds(410,200,400, 100);
-        totalAmountLabel = new JLabel("Total amount of emails: -");
-        totalAmountLabel.setBounds(450, 180, 200, 20);
-        unreadLabel = new JLabel("Unread: -");
-        unreadLabel.setBounds(650, 180, 150, 20);
+        scrollPane.setPreferredSize(new Dimension(400, 110));
+        scrollPane.setBounds(410,180,400, 120);
+
+
 
         readEmailArea = new JTextArea();
         readEmailArea.setLineWrap(true);
@@ -121,10 +137,12 @@ public class EmailClient extends JFrame  {
         this.add(toLabel);
         this.add(subjectField);
         this.add(subjectLabel);
-        this.add(statusLabel);
+        this.add(attachmentLabel);
+        this.add(sentStatusLabel);
         this.add(messeageArea);
         this.add(scrollReadEmail);
 
+        this.add(downloadStatusLabel);
         this.add(readBtn);
         this.add(getAttachBtn);
         this.add(refreshBtn);
@@ -138,8 +156,8 @@ public class EmailClient extends JFrame  {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
 
-    public void setStatusLabel(String msg){
-        statusLabel.setText("Status: "+msg);
+    public void setSentStatusLabel(String msg){
+        sentStatusLabel.setText("Status: "+msg);
     }
 
     public void getCredentials(){
@@ -149,15 +167,11 @@ public class EmailClient extends JFrame  {
 
     public void toggleSignInOut(){
         if (signInOutBtn.getText().equalsIgnoreCase("Sign in")) {
-                usernameField.setEnabled(false);
-                passwordField.setEnabled(false);
-                signInOutBtn.setText("Sign out");
-                fromField.setText(username);
+                signIn();
             } else if (signInOutBtn.getText().equalsIgnoreCase("Sign out")) {
-                usernameField.setEnabled(true);
-                passwordField.setEnabled(true);
-                fromField.setText("");
-                signInOutBtn.setText("Sign in");
+                signOut();
+                disableEmail();
+
         } else{
             System.out.println("No input");
         }
@@ -200,6 +214,25 @@ public class EmailClient extends JFrame  {
         readEmailArea.setText(null);
         readEmailArea.setEditable(false);
     }
+    public void signOut(){
+        usernameField.setEnabled(true);
+        passwordField.setEnabled(true);
+        fromField.setText("");
+        signInOutBtn.setText("Sign in");
+        attachmentLabel.setText("Attachments: ");
+        messeageArea.append("");
+        l1.removeAllElements();
+        totalAmountLabel.setText("");
+        unreadLabel.setText("");
+        setDownloadStatusLabel("-");
+    }
+
+    public void signIn(){
+        usernameField.setEnabled(false);
+        passwordField.setEnabled(false);
+        signInOutBtn.setText("Sign out");
+        fromField.setText(username);
+    }
 
     public void clearEmailInput(){
         toField.setText(null);
@@ -208,7 +241,7 @@ public class EmailClient extends JFrame  {
     }
 
     public void sendListner(ActionEvent e){
-        EmailSender newEmail = new EmailSender(this, username, password, toField.getText(),subjectField.getText(), messeageArea.getText(), selectedFile);
+        EmailSender newEmail = new EmailSender(this, username, password, toField.getText(),subjectField.getText(), messeageArea.getText(), attachmentsList);
         newEmail.run();
     }
 
@@ -223,15 +256,14 @@ public class EmailClient extends JFrame  {
                     return new PasswordAuthentication(username, password);
                 }
             });
-            //TODO - Funkar inte med brandväggen?
             emailReciver = new EmailReciver(this, username, password, l1);
             toggleSignInOut();
             enableEmail();
             refreshBtn.setEnabled(true);
+            setDownloadStatusLabel("Signed in");
             emailReciver.start();
         } else {
         toggleSignInOut();
-        disableEmail();
     }
     }
 
@@ -241,7 +273,24 @@ public class EmailClient extends JFrame  {
         int result = fileChooser.showOpenDialog(this);
         if(result == JFileChooser.APPROVE_OPTION){
             selectedFile = fileChooser.getSelectedFile();
+            attachmentsList.add(selectedFile);
+            updateAttachmentLabel();
         }
+    }
+
+    public void updateAttachmentLabel() {
+        attachmentLabel.setText("Attachments: " +getAttachmentNames());
+    }
+
+    public String getAttachmentNames() {
+        ArrayList<String> attachmentNames = new ArrayList<>();
+        String attachmentName = "";
+        for(int i = 0; i<attachmentsList.size(); i++){
+            attachmentName = attachmentsList.get(i).getName();
+            attachmentNames.add(attachmentName);
+
+        }
+        return attachmentNames.toString();
     }
 
     public void refreshListner(ActionEvent e){
@@ -255,27 +304,35 @@ public class EmailClient extends JFrame  {
 
     }
 
-    public void getAttachmentListner(ActionEvent e){
+    public void getAttachmentListner(ActionEvent e) {
         Email email = inboxArea.getSelectedValue();
-        String attachment = email.getAttachment();
-
-        //TODO - Spara filen
+        MimeBodyPart part = email.getAttachemtPart();
+        String attachementName = email.getAttachmentName();
+        setDownloadStatusLabel("Fetching attachment..");
+        try {
+            part.saveFile("M:\\My Documents\\" + attachementName);
+            setDownloadStatusLabel("Attachment download complete");
+        }catch (MessagingException | IOException me){
+            System.out.println(me);
+            setDownloadStatusLabel("Download failed");
+        }
     }
 
     public void writeEmail(Email email){
         readEmailArea.setText(null);
-        System.out.println(email.getAttachment());
-        if(email.getAttachment().equals("")){
-            readEmailArea.append("\n"+ email.getMessage());
-        } else {
-            readEmailArea.append("Attachment: " +email.getAttachment() + "\n");
-            readEmailArea.append("\n"+ email.getMessage());
+        System.out.println(email.getAttachmentName());
+        if (!email.getAttachmentName().equals("")) {
+            readEmailArea.append("Attachment: " + email.getAttachmentName() + "\n");
 
         }
+        readEmailArea.append("\n"+ email.getMessage());
     }
 
+    public void setDownloadStatusLabel(String msg){
+        downloadStatusLabel.setText("Download status: " +msg);
+    }
 
-        public static void main(String[] args) {
+    public static void main(String[] args) {
         EmailClient emailClient = new EmailClient();
 
     }
@@ -285,12 +342,12 @@ public class EmailClient extends JFrame  {
 
 class EmailSender extends Thread{
     EmailClient emailClient;
-    File selectedFile;
+    ArrayList<File> selectedFile;
     String username, password, toAddress, subject, msg;
     Session session;
     Message message;
 
-    EmailSender(EmailClient emailClient, String username, String password, String toAddress, String subject, String msg, File selectedFile){
+    EmailSender(EmailClient emailClient, String username, String password, String toAddress, String subject, String msg, ArrayList<File> selectedFile){
         this.emailClient = emailClient;
         this.username = username;
         this.password = password;
@@ -307,8 +364,9 @@ class EmailSender extends Thread{
     }
 
     public void createSession(){
-        emailClient.setStatusLabel("Creating email..");
+        emailClient.setSentStatusLabel("Creating email..");
         Properties properties = new Properties();
+        properties.setProperty("mail.imap.partialfetch", "false");
         properties.put("mail.transport.protocol", "smtp");
         properties.put("mail.smtp.host", "smtp-mail.outlook.com");
         properties.put("mail.smtp.starttls.enable", "true");
@@ -330,21 +388,19 @@ class EmailSender extends Thread{
         try{
             Transport.send(message);
             emailClient.clearEmailInput();
-            emailClient.setStatusLabel("Email sent!");
             setSuccessMsg();
         } catch (MessagingException me){
-            System.out.println(me);
-            emailClient.setStatusLabel("Something went wrong, try again.");
+            emailClient.setSentStatusLabel("Something went wrong, try again.");
         }
     }
 
     public void setSuccessMsg(){
-
+        emailClient.setSentStatusLabel("Email sent!");
     }
 
     public synchronized void prepMessage(){
         try {
-            emailClient.setStatusLabel("Sending email..");
+            emailClient.setSentStatusLabel("Sending email..");
             message = new MimeMessage(session);
             Multipart multipart = new MimeMultipart();
             message.setFrom(new InternetAddress(username, username));
@@ -356,26 +412,27 @@ class EmailSender extends Thread{
             messageText.setText(msg);
             multipart.addBodyPart(messageText);
 
-            MimeBodyPart attachment = new MimeBodyPart();
+            for(File file: selectedFile) {
+                MimeBodyPart attachment = new MimeBodyPart();
 
-            String filename = selectedFile.getAbsolutePath();
-            attachment.attachFile(filename);
+                String filename = file.getAbsolutePath();
+                attachment.attachFile(filename);
 
-            multipart.addBodyPart(attachment);
-            message.setContent(multipart);
-
+                multipart.addBodyPart(attachment);
+                message.setContent(multipart);
+            }
 
         }  catch (UnsupportedEncodingException e) {
-            emailClient.setStatusLabel("Something went wrong, try again.");
+            emailClient.setSentStatusLabel("Something went wrong, try again.");
             e.printStackTrace();
         } catch (AddressException e) {
-            emailClient.setStatusLabel("Something went wrong, try again.");
+            emailClient.setSentStatusLabel("Something went wrong, try again.");
             e.printStackTrace();
         } catch (MessagingException e) {
-            emailClient.setStatusLabel("Something went wrong, try again.");
+            emailClient.setSentStatusLabel("Something went wrong, try again.");
             e.printStackTrace();
         } catch (IOException e) {
-            emailClient.setStatusLabel("Something went wrong, try again.");
+            emailClient.setSentStatusLabel("Something went wrong, try again.");
             e.printStackTrace();
         }
     }
@@ -391,6 +448,7 @@ class EmailReciver extends Thread{
     private int unreadCount, totalCount;
     private String username, password;
     private boolean signedIn = false;
+    private MimeBodyPart part;
     private DefaultListModel <String> l1;
 
     public EmailReciver(EmailClient emailClient, String username, String password, DefaultListModel l1){
@@ -412,45 +470,28 @@ class EmailReciver extends Thread{
         totalAmountLabel.setText("Total amount of emails: "+totalCount);
     }
 
-
     public void start(){
-                System.out.println("Clearin");
                 clearTextArea();
-                System.out.println("Fetching");
                 fetchEmails();
         }
 
-
-
-
-  /*  public void print(String msg){
-        inboxArea.append(msg+ "\n");
-    }
-
-    public void printFullEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles){
-            inboxArea.append("\n");
-            inboxArea.append("From: " +fromAddress+"\n");
-            inboxArea.append("Subject: "+subject+"\n");
-            inboxArea.append("Date: "+sentDate+"\n");
-            inboxArea.append("Attachment: "+attachFiles+"\n");
-            inboxArea.append("Message: "+messageContent+"\n");
-            inboxArea.append("------------------------------------");
-            inboxArea.append("\n");
-    }*/
-
-
-
-    public void createEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles){
-        Email newEmail = new Email(fromAddress,subject,sentDate,attachFiles,messageContent, l1);
+    public void createEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles, MimeBodyPart part){
+        Email newEmail = new Email(fromAddress,subject,sentDate,attachFiles,messageContent,part, l1);
         newEmail.add();
     }
 
+    public String getSubject(Message msg)throws MessagingException, IOException {
+            if (msg.getSubject() != null) {
+                return msg.getSubject();
+            } else
+                return "No subject";
+    }
 
     public void getEmailContent(Message msg) {
     try {
 
         String fromAddress = msg.getFrom()[0].toString();
-        String subject = msg.getSubject();
+        String subject = getSubject(msg);
         String sentDate = msg.getSentDate().toString();
         String attachFiles = "";
         String contentType = msg.getContentType();
@@ -461,26 +502,14 @@ class EmailReciver extends Thread{
          Multipart multipart = (Multipart) msg.getContent();
          int numberOfParts = multipart.getCount();
          for (int i = 0; i< numberOfParts; i++){
-             MimeBodyPart part = (MimeBodyPart) multipart.getBodyPart(i);
+             part = (MimeBodyPart) multipart.getBodyPart(i);
              if(Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())){
-                 String fileName = part.getFileName();
-                 attachFiles += fileName +",";
-
-
+                 attachFiles = part.getFileName();
              } else{
-                 messageContent = part.getContent().toString();
+                 messageContent = getTextFromEmail(msg);
              }
          }
-         if(attachFiles.length() > 1){
-             attachFiles = attachFiles.substring(0,attachFiles.length() -2);
-         } else if(contentType.contains("text/plain")
-             || contentType.contains("text/html")){
-             Object content = msg.getContent();
-             if(content != null){
-                 messageContent = content.toString();
-             }
-            }
-         createEmail(fromAddress,subject,sentDate,messageContent, attachFiles);
+         createEmail(fromAddress,subject,sentDate,messageContent, attachFiles, part);
 
         }
     } catch (MessagingException me){
@@ -490,8 +519,35 @@ class EmailReciver extends Thread{
     }
     }
 
+    public String getTextFromEmail(Message msg)throws MessagingException, IOException{
+        String result = "";
+        if(msg.isMimeType("text/plain")){
+            result = msg.getContent().toString();
+        } else if(msg.isMimeType("multipart/*")){
+            MimeMultipart mimeMultipart = (MimeMultipart) msg.getContent();
+            result = getTextFromMimeMultipart(mimeMultipart);
+        }
+        return result;
+    }
 
+    public String getTextFromMimeMultipart(MimeMultipart mimeMultipart) throws MessagingException, IOException{
+        String result = "";
+        int count = mimeMultipart.getCount();
 
+        for(int i = 0; i < count; i++){
+           BodyPart bodyPart = mimeMultipart.getBodyPart(i);
+           if(bodyPart.isMimeType("text/plain")){
+               result = result+ "\n"+bodyPart.getContent();
+               break;
+           } else  if(bodyPart.isMimeType("text/html")){
+               String html = (String) bodyPart.getContent();
+               result = result +"\n"+org.jsoup.Jsoup.parse(html).text();
+           } else if(bodyPart.getContent() instanceof MimeMultipart){
+               result = result+getTextFromMimeMultipart((MimeMultipart) bodyPart.getContent());
+           }
+        }
+        return result;
+    }
 
     public synchronized void fetchEmails(){
         try{
@@ -504,7 +560,6 @@ class EmailReciver extends Thread{
                 }
             });
             Store emailStore = session.getStore("imaps");
-            System.out.println("Connecting");
             emailStore.connect("smtp-mail.outlook.com", username, password);
 
 
@@ -537,10 +592,6 @@ class EmailReciver extends Thread{
         }
     }
 
-    public boolean isSignedIn() {
-        return signedIn;
-    }
-
     public void kill(){
         alive = false;
     }
@@ -550,31 +601,38 @@ class Email {
     private String from;
     private String subject;
     private String date;
-    private String attachment;
+    private String attachmentName;
     private String message;
     private DefaultListModel <Email> l1;
+    private MimeBodyPart attachemtPart;
 
-    public Email(String from, String subject, String date, String attachment, String message, DefaultListModel l1){
+    public Email(String from, String subject, String date, String attachment, String message,MimeBodyPart part , DefaultListModel l1){
         this.from = from;
         this.subject = subject;
         this.date = date;
-        this.attachment = attachment;
+        this.attachmentName = attachment;
         this.message = message;
         this.l1 = l1;
+        this.attachemtPart = part;
     }
 
     public void add(){
         l1.addElement(this);
     }
 
-    public String getAttachment(){
-        return attachment.trim();
+    public MimeBodyPart getAttachemtPart(){
+        return attachemtPart;
     }
+
+    public String getAttachmentName(){
+        return attachmentName.trim();
+    }
+
     public String getMessage(){
         return message;
     }
 
     public String toString(){
-        return subject + " From:" +from;
+        return "Subject: "+subject  + " From:" +from;
     }
 }
