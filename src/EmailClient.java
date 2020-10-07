@@ -1,3 +1,4 @@
+import javafx.stage.FileChooser;
 import org.apache.commons.lang3.ArrayUtils;
 
 import javax.mail.*;
@@ -309,12 +310,35 @@ public class EmailClient extends JFrame  {
         MimeBodyPart part = email.getAttachemtPart();
         String attachementName = email.getAttachmentName();
         setDownloadStatusLabel("Fetching attachment..");
+
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setCurrentDirectory(new File("/home/"));
+        int result = fileChooser.showSaveDialog(this);
+        File temp = null;
         try {
-            part.saveFile("M:\\My Documents\\" + attachementName);
-            setDownloadStatusLabel("Attachment download complete");
-        }catch (MessagingException | IOException me){
-            System.out.println(me);
-            setDownloadStatusLabel("Download failed");
+            temp = new File(part.getFileName());
+        } catch (MessagingException messagingException) {
+            messagingException.printStackTrace();
+        }
+        fileChooser.setSelectedFile(temp);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            try {
+                InputStream is = part.getInputStream();
+                File newFile = new File(part.getFileName());
+                FileOutputStream fos = new FileOutputStream(newFile);
+                byte[] buffer = new byte[4096];
+                int byteRead;
+                while ((byteRead = is.read(buffer)) != 1) {
+                    fos.write(buffer, 0, byteRead);
+                }
+                fos.close();
+
+
+            } catch (MessagingException messagingException) {
+                messagingException.printStackTrace();
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
         }
     }
 
