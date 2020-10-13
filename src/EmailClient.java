@@ -312,31 +312,12 @@ public class EmailClient extends JFrame  {
         setDownloadStatusLabel("Fetching attachment..");
 
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setCurrentDirectory(new File("/home/"));
-        int result = fileChooser.showSaveDialog(this);
-        File temp = null;
-        try {
-            temp = new File(part.getFileName());
-        } catch (MessagingException messagingException) {
-            messagingException.printStackTrace();
-        }
-        fileChooser.setSelectedFile(temp);
+        fileChooser.setSelectedFile(new File(attachementName));
+        int result = fileChooser.showSaveDialog(fileChooser);
         if (result == JFileChooser.APPROVE_OPTION) {
             try {
-                InputStream is = part.getInputStream();
-                File newFile = new File(part.getFileName());
-                FileOutputStream fos = new FileOutputStream(newFile);
-                byte[] buffer = new byte[4096];
-                int byteRead;
-                while ((byteRead = is.read(buffer)) != 1) {
-                    fos.write(buffer, 0, byteRead);
-                }
-                fos.close();
-
-
-            } catch (MessagingException messagingException) {
-                messagingException.printStackTrace();
-            } catch (IOException ioException) {
+                part.saveFile(fileChooser.getSelectedFile());
+            } catch (IOException | MessagingException ioException) {
                 ioException.printStackTrace();
             }
         }
