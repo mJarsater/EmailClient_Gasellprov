@@ -1,4 +1,3 @@
-import javafx.stage.FileChooser;
 import org.apache.commons.lang3.ArrayUtils;
 
 import javax.mail.*;
@@ -7,10 +6,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.*;
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Properties;
+import java.util.*;
 
 public class EmailClient extends JFrame  {
     private JPasswordField passwordField;
@@ -215,6 +211,7 @@ public class EmailClient extends JFrame  {
         readEmailArea.setText(null);
         readEmailArea.setEditable(false);
     }
+
     public void signOut(){
         usernameField.setEnabled(true);
         passwordField.setEnabled(true);
@@ -308,8 +305,18 @@ public class EmailClient extends JFrame  {
     public void getAttachmentListner(ActionEvent e) {
         Email email = inboxArea.getSelectedValue();
         MimeBodyPart part = email.getAttachemtPart();
-        String attachementName = email.getAttachmentName();
+        String attachementName= "";
         setDownloadStatusLabel("Fetching attachment..");
+
+        HashMap<String, MimeBodyPart> attachments = email.getHashMap();
+        if(attachments.size() > 1) {
+            String[] attachmentList = attachments.keySet().toArray(new String[0]);
+             attachementName = (String) JOptionPane.showInputDialog(
+                    null, "Which file?", "title"
+                    , JOptionPane.QUESTION_MESSAGE, null, attachmentList, attachmentList[0]);
+        } else{
+             attachementName = email.getAttachmentName();
+        }
 
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setSelectedFile(new File(attachementName));
@@ -327,7 +334,12 @@ public class EmailClient extends JFrame  {
         readEmailArea.setText(null);
         System.out.println(email.getAttachmentName());
         if (!email.getAttachmentName().equals("")) {
-            readEmailArea.append("Attachment: " + email.getAttachmentName() + "\n");
+            readEmailArea.append("Attachments: ");
+            HashMap<String, MimeBodyPart> attachments = email.getHashMap();
+            for(Map.Entry<String, MimeBodyPart> entry : attachments.entrySet()){
+                readEmailArea.append(entry.getKey() +" ");
+            }
+
 
         }
         readEmailArea.append("\n"+ email.getMessage());
@@ -480,8 +492,8 @@ class EmailReciver extends Thread{
                 fetchEmails();
         }
 
-    public void createEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles, MimeBodyPart part){
-        Email newEmail = new Email(fromAddress,subject,sentDate,attachFiles,messageContent,part, l1);
+    public void createEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles, MimeBodyPart part, HashMap <String, MimeBodyPart> attachments){
+        Email newEmail = new Email(fromAddress,subject,sentDate,attachFiles,messageContent,part, l1, attachments);
         newEmail.add();
     }
 
@@ -501,21 +513,26 @@ class EmailReciver extends Thread{
         String attachFiles = "";
         String contentType = msg.getContentType();
         String messageContent = "";
-
+        HashMap <String, MimeBodyPart> attachments = new HashMap<>();
 
         if(contentType.contains("multipart")){
          Multipart multipart = (Multipart) msg.getContent();
          int numberOfParts = multipart.getCount();
+         System.out.println(subject + " "+numberOfParts);
          for (int i = 0; i< numberOfParts; i++){
              part = (MimeBodyPart) multipart.getBodyPart(i);
              if(Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())){
                  attachFiles = part.getFileName();
+                 System.out.println(attachFiles);
+                 attachments.put(attachFiles, part);
              } else{
                  messageContent = getTextFromEmail(msg);
              }
          }
-         createEmail(fromAddress,subject,sentDate,messageContent, attachFiles, part);
-
+         createEmail(fromAddress,subject,sentDate,messageContent, attachFiles, part, attachments);
+            attachments.entrySet().forEach(entry->{
+                System.out.println(entry.getKey() + " : " + entry.getValue());
+            });
         }
     } catch (MessagingException me){
         me.printStackTrace();
@@ -610,8 +627,9 @@ class Email {
     private String message;
     private DefaultListModel <Email> l1;
     private MimeBodyPart attachemtPart;
+    private HashMap <String, MimeBodyPart> attachments;
 
-    public Email(String from, String subject, String date, String attachment, String message,MimeBodyPart part , DefaultListModel l1){
+    public Email(String from, String subject, String date, String attachment, String message,MimeBodyPart part , DefaultListModel l1, HashMap <String, MimeBodyPart> attachments){
         this.from = from;
         this.subject = subject;
         this.date = date;
@@ -619,6 +637,7 @@ class Email {
         this.message = message;
         this.l1 = l1;
         this.attachemtPart = part;
+        this.attachments = attachments;
     }
 
     public void add(){
@@ -639,5 +658,9 @@ class Email {
 
     public String toString(){
         return "Subject: "+subject  + " From:" +from;
+    }
+
+    public HashMap getHashMap(){
+        return attachments;
     }
 }
