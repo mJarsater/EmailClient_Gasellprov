@@ -17,11 +17,12 @@ public class EmailClient extends JFrame  {
     private JTextArea messeageArea, readEmailArea;
     private JScrollPane scrollPane, scrollReadEmail;
     private File selectedFile;
-    private EmailReciver emailReciver;
+    private EmailReceiver emailReceiver;
     private Session session;
     private DefaultListModel <Email> l1;
     private JList<Email> inboxArea;
     private ArrayList<File> attachmentsList = new ArrayList<>();
+    private JFileChooser fileChooser;
 
 
 
@@ -36,17 +37,17 @@ public class EmailClient extends JFrame  {
         passwordField.setBounds(80,30,100,20);
         signInOutBtn = new JButton("Sign in");
         signInOutBtn.setBounds(200, 5, 100, 45);
-        signInOutBtn.addActionListener(this:: signInOutListner);
+        signInOutBtn.addActionListener(this::signInOutListener);
 
         //-----------------SEND AREA--------------------------
         sendBtn = new JButton("Send");
         sendBtn.setBounds(200, 100, 100, 30);
         sendBtn.setEnabled(false);
-        sendBtn.addActionListener(this:: sendListner);
+        sendBtn.addActionListener(this::sendListener);
         attachBtn = new JButton("Attachment");
         attachBtn.setBounds(200, 135, 100, 30);
         attachBtn.setEnabled(false);
-        attachBtn.addActionListener(this:: attachmentListner);
+        attachBtn.addActionListener(this::attachmentListener);
         fromField = new JTextField();
         fromLabel = new JLabel("From:");
         fromLabel.setBounds(5,100,50, 20);
@@ -91,17 +92,17 @@ public class EmailClient extends JFrame  {
 
         refreshBtn = new JButton("Refresh");
         refreshBtn.setEnabled(false);
-        refreshBtn.addActionListener(this :: refreshListner);
+        refreshBtn.addActionListener(this ::refreshListener);
         refreshBtn.setBounds(410, 125, 130, 45);
 
         readBtn = new JButton("Read");
         readBtn.setEnabled(false);
         readBtn.setBounds(545,125, 130, 45 );
-        readBtn.addActionListener(this::readListner);
+        readBtn.addActionListener(this::readListener);
 
         getAttachBtn = new JButton("Save attachment");
         getAttachBtn.setEnabled(false);
-        getAttachBtn.addActionListener(this :: getAttachmentListner);
+        getAttachBtn.addActionListener(this ::getAttachmentListener);
         getAttachBtn.setBounds(680, 125, 130, 45);
 
         l1 = new DefaultListModel<>();
@@ -236,14 +237,20 @@ public class EmailClient extends JFrame  {
         toField.setText(null);
         subjectField.setText(null);
         messeageArea.setText(null);
+        for(int i = 0; i < attachmentsList.size(); i++){
+            attachmentsList.remove(i);
+        }
+        attachmentLabel.setText("Attachments: ");
     }
 
-    public void sendListner(ActionEvent e){
+    public void sendListener(ActionEvent e){
         EmailSender newEmail = new EmailSender(this, username, password, toField.getText(),subjectField.getText(), messeageArea.getText(), attachmentsList);
         newEmail.run();
+
     }
 
-    public void signInOutListner(ActionEvent e) {
+
+    public void signInOutListener(ActionEvent e) {
         if(signInOutBtn.getText().equals("Sign in")) {
             getCredentials();
             Properties properties = new Properties();
@@ -254,18 +261,18 @@ public class EmailClient extends JFrame  {
                     return new PasswordAuthentication(username, password);
                 }
             });
-            emailReciver = new EmailReciver(this, username, password, l1);
+            emailReceiver = new EmailReceiver(this, username, password, l1);
             toggleSignInOut();
             enableEmail();
             refreshBtn.setEnabled(true);
             setDownloadStatusLabel("Signed in");
-            emailReciver.start();
+            emailReceiver.start();
         } else {
         toggleSignInOut();
     }
     }
 
-    public void attachmentListner(ActionEvent e){
+    public void attachmentListener(ActionEvent e){
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
         int result = fileChooser.showOpenDialog(this);
@@ -291,57 +298,75 @@ public class EmailClient extends JFrame  {
         return attachmentNames.toString();
     }
 
-    public void refreshListner(ActionEvent e){
-        emailReciver.start();
+    public boolean checkAttachmentAmount(Email email){
+        HashMap<String, MimeBodyPart> attachments = email.getHashMap();
+        String attachmentName;
+        if(attachments.size() < 1){
+            JOptionPane.showMessageDialog(this,"This emai has no attachment.", "Email attachment", JOptionPane.INFORMATION_MESSAGE);
+            return false;
+        } else if(attachments.size() > 1) {
+            String[] attachmentList = attachments.keySet().toArray(new String[0]);
+            attachmentName = (String) JOptionPane.showInputDialog(
+                    null, "Which file?", "Save attachment"
+                    , JOptionPane.QUESTION_MESSAGE, null, attachmentList, attachmentList[0]);
+            fileChooser = new JFileChooser();
+            fileChooser.setSelectedFile(new File(attachmentName));
+            return true;
+        } else{
+            attachmentName = email.getAttachmentName();
+            fileChooser.setSelectedFile(new File(attachmentName));
+            return true;
+        }
     }
 
-    public void readListner(ActionEvent e){
+    public void getFileChoose(MimeBodyPart part){
+
+
+        int result = fileChooser.showSaveDialog(fileChooser);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            try {
+                part.saveFile(fileChooser.getSelectedFile());
+                setDownloadStatusLabel("Done!");
+            } catch (IOException | MessagingException ioException) {
+                ioException.printStackTrace();
+                setDownloadStatusLabel("Failed!");
+            }
+        }
+    }
+
+    public void refreshListener(ActionEvent e){
+        emailReceiver.refresh();
+    }
+
+    public void readListener(ActionEvent e){
             Email email = inboxArea.getSelectedValue();
             writeEmail(email);
 
 
     }
 
-    public void getAttachmentListner(ActionEvent e) {
+    public void getAttachmentListener(ActionEvent e) {
         Email email = inboxArea.getSelectedValue();
         MimeBodyPart part = email.getAttachemtPart();
-        String attachementName= "";
         setDownloadStatusLabel("Fetching attachment..");
 
-        HashMap<String, MimeBodyPart> attachments = email.getHashMap();
-        if(attachments.size() > 1) {
-            String[] attachmentList = attachments.keySet().toArray(new String[0]);
-             attachementName = (String) JOptionPane.showInputDialog(
-                    null, "Which file?", "title"
-                    , JOptionPane.QUESTION_MESSAGE, null, attachmentList, attachmentList[0]);
-        } else{
-             attachementName = email.getAttachmentName();
-        }
+        boolean hasAttachment = checkAttachmentAmount(email);
 
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setSelectedFile(new File(attachementName));
-        int result = fileChooser.showSaveDialog(fileChooser);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            try {
-                part.saveFile(fileChooser.getSelectedFile());
-            } catch (IOException | MessagingException ioException) {
-                ioException.printStackTrace();
-            }
+        if(hasAttachment) {
+            getFileChoose(part);
         }
     }
 
     public void writeEmail(Email email){
         readEmailArea.setText(null);
-        System.out.println(email.getAttachmentName());
         if (!email.getAttachmentName().equals("")) {
             readEmailArea.append("Attachments: ");
             HashMap<String, MimeBodyPart> attachments = email.getHashMap();
             for(Map.Entry<String, MimeBodyPart> entry : attachments.entrySet()){
                 readEmailArea.append(entry.getKey() +" ");
             }
-
-
         }
+        readEmailArea.append("Date: "+email.getDate() + "\n");
         readEmailArea.append("\n"+ email.getMessage());
     }
 
@@ -350,7 +375,7 @@ public class EmailClient extends JFrame  {
     }
 
     public static void main(String[] args) {
-        EmailClient emailClient = new EmailClient();
+        new EmailClient();
 
     }
 
@@ -362,7 +387,7 @@ class EmailSender extends Thread{
     ArrayList<File> selectedFile;
     String username, password, toAddress, subject, msg;
     Session session;
-    Message message;
+
 
     EmailSender(EmailClient emailClient, String username, String password, String toAddress, String subject, String msg, ArrayList<File> selectedFile){
         this.emailClient = emailClient;
@@ -377,7 +402,8 @@ class EmailSender extends Thread{
     public void run(){
         createSession();
         prepMessage();
-        sendMessage();
+
+
     }
 
     public void createSession(){
@@ -401,12 +427,13 @@ class EmailSender extends Thread{
         });
     }
 
-    public void sendMessage(){
+    public void sendMessage(MimeMessage message){
         try{
             Transport.send(message);
             emailClient.clearEmailInput();
             setSuccessMsg();
         } catch (MessagingException me){
+            me.printStackTrace();
             emailClient.setSentStatusLabel("Something went wrong, try again.");
         }
     }
@@ -418,26 +445,31 @@ class EmailSender extends Thread{
     public synchronized void prepMessage(){
         try {
             emailClient.setSentStatusLabel("Sending email..");
-            message = new MimeMessage(session);
-            Multipart multipart = new MimeMultipart();
+            MimeMessage message = new MimeMessage(session);
+
             message.setFrom(new InternetAddress(username, username));
             message.setRecipient(Message.RecipientType.TO, new InternetAddress(toAddress));
             message.setSubject(subject);
             message.setSentDate(new Date());
 
-            BodyPart messageText = new MimeBodyPart();
-            messageText.setText(msg);
-            multipart.addBodyPart(messageText);
+            if(selectedFile.size() > 0) {
+                Multipart multipart = new MimeMultipart();
+                BodyPart messageText = new MimeBodyPart();
+                messageText.setText(msg);
+                multipart.addBodyPart(messageText);
 
-            for(File file: selectedFile) {
-                MimeBodyPart attachment = new MimeBodyPart();
+                for (File file : selectedFile) {
+                    MimeBodyPart attachment = new MimeBodyPart();
 
-                String filename = file.getAbsolutePath();
-                attachment.attachFile(filename);
+                    String filename = file.getAbsolutePath();
+                    attachment.attachFile(filename);
 
-                multipart.addBodyPart(attachment);
-                message.setContent(multipart);
+                    multipart.addBodyPart(attachment);
+                    message.setContent(multipart);
+                }
             }
+            message.setText(msg);
+            sendMessage(message);
 
         }  catch (UnsupportedEncodingException e) {
             emailClient.setSentStatusLabel("Something went wrong, try again.");
@@ -452,13 +484,14 @@ class EmailSender extends Thread{
             emailClient.setSentStatusLabel("Something went wrong, try again.");
             e.printStackTrace();
         }
+
     }
 
 
 }
 
-class EmailReciver extends Thread{
-    private boolean alive = true;
+class EmailReceiver{
+
     private EmailClient emailClient;
     private JList inboxArea;
     private JLabel unreadLabel, totalAmountLabel;
@@ -468,7 +501,7 @@ class EmailReciver extends Thread{
     private MimeBodyPart part;
     private DefaultListModel <String> l1;
 
-    public EmailReciver(EmailClient emailClient, String username, String password, DefaultListModel l1){
+    public EmailReceiver(EmailClient emailClient, String username, String password, DefaultListModel l1){
         this.emailClient = emailClient;
         this.inboxArea = emailClient.getInboxArea();
         this.unreadLabel = emailClient.getUnreadLabel();
@@ -487,9 +520,17 @@ class EmailReciver extends Thread{
         totalAmountLabel.setText("Total amount of emails: "+totalCount);
     }
 
-    public void start(){
-                clearTextArea();
-                fetchEmails();
+    public void start() {
+        l1.removeAllElements();
+        clearTextArea();
+        fetchEmails();
+        new ConstantRefresher(this, emailClient);
+    }
+
+    public void refresh(){
+        l1.removeAllElements();
+        clearTextArea();
+        fetchEmails();
         }
 
     public void createEmail(String fromAddress, String subject, String sentDate, String messageContent, String attachFiles, MimeBodyPart part, HashMap <String, MimeBodyPart> attachments){
@@ -518,21 +559,17 @@ class EmailReciver extends Thread{
         if(contentType.contains("multipart")){
          Multipart multipart = (Multipart) msg.getContent();
          int numberOfParts = multipart.getCount();
-         System.out.println(subject + " "+numberOfParts);
          for (int i = 0; i< numberOfParts; i++){
              part = (MimeBodyPart) multipart.getBodyPart(i);
              if(Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())){
                  attachFiles = part.getFileName();
-                 System.out.println(attachFiles);
                  attachments.put(attachFiles, part);
              } else{
                  messageContent = getTextFromEmail(msg);
              }
          }
          createEmail(fromAddress,subject,sentDate,messageContent, attachFiles, part, attachments);
-            attachments.entrySet().forEach(entry->{
-                System.out.println(entry.getKey() + " : " + entry.getValue());
-            });
+
         }
     } catch (MessagingException me){
         me.printStackTrace();
@@ -607,16 +644,39 @@ class EmailReciver extends Thread{
             }
 
         } catch (AuthenticationFailedException e){
-            System.out.print("Authentication failed");
-            System.out.print("Wrong email/password");
+            JOptionPane.showMessageDialog(emailClient,"Wrong email or password!", "Authentication failed", JOptionPane.ERROR_MESSAGE);
+            emailClient.toggleSignInOut();
         } catch (MessagingException me){
-            System.out.println(me);
+            me.printStackTrace();
         }
     }
 
-    public void kill(){
-        alive = false;
+}
+
+class ConstantRefresher extends Thread{
+        private EmailReceiver emailReceiver;
+        private EmailClient emailClient;
+        private boolean alive = true;
+        public ConstantRefresher(EmailReceiver emailReceiver, EmailClient emailClient){
+            this.emailClient = emailClient;
+            this.emailReceiver = emailReceiver;
+            start();
+        }
+
+    public void run() {
+        while (alive) {
+            try {
+                sleep(60000);
+                emailClient.setDownloadStatusLabel("Refreshing..");
+                System.out.println("Refreshing...");
+                emailReceiver.refresh();
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            }
+        }
     }
+
+
 }
 
 class Email {
@@ -625,23 +685,23 @@ class Email {
     private String date;
     private String attachmentName;
     private String message;
-    private DefaultListModel <Email> l1;
+    private DefaultListModel <Email> defaultListModel;
     private MimeBodyPart attachemtPart;
     private HashMap <String, MimeBodyPart> attachments;
 
-    public Email(String from, String subject, String date, String attachment, String message,MimeBodyPart part , DefaultListModel l1, HashMap <String, MimeBodyPart> attachments){
+    public Email(String from, String subject, String date, String attachment, String message, MimeBodyPart part , DefaultListModel defaultListModel, HashMap <String, MimeBodyPart> attachments){
         this.from = from;
         this.subject = subject;
         this.date = date;
         this.attachmentName = attachment;
         this.message = message;
-        this.l1 = l1;
+        this.defaultListModel = defaultListModel;
         this.attachemtPart = part;
         this.attachments = attachments;
     }
 
     public void add(){
-        l1.addElement(this);
+        defaultListModel.addElement(this);
     }
 
     public MimeBodyPart getAttachemtPart(){
@@ -662,5 +722,9 @@ class Email {
 
     public HashMap getHashMap(){
         return attachments;
+    }
+
+    public String getDate(){
+        return date;
     }
 }
