@@ -11,7 +11,7 @@ import java.util.*;
 public class EmailClient extends JFrame {
     private JPasswordField passwordField;
     private JTextField usernameField, fromField, toField, subjectField;
-    private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel, attachmentLabel, unreadLabel, totalAmountLabel, sentStatusLabel, downloadStatusLabel;
+    private JLabel passwordLabel, usernameLabel, fromLabel, toLabel, subjectLabel, attachmentLabel, unreadLabel, totalAmountLabel, sentStatusLabel, downloadStatusLabel, amountOfEmailsToShowLabel;
     private JButton signInOutBtn, sendBtn, attachBtn, refreshBtn, readBtn, getAttachBtn;
     private String username, password;
     private JTextArea messeageArea, readEmailArea;
@@ -19,11 +19,13 @@ public class EmailClient extends JFrame {
     private File selectedFile;
     private EmailReceiver emailReceiver;
     private Session session;
-    private DefaultListModel<Email> l1;
+    private DefaultListModel<Email> defaultListModel;
     private JList<Email> inboxArea;
     private ArrayList<File> attachmentsList = new ArrayList<>();
     private JFileChooser fileChooser;
-
+    private int amountOfEmailsToShow;
+    private JComboBox amountToShowBox;
+    private String amountToShow[] = {"10","50","10","200"};
 
     // Konstruktor för EmailClient - GUI
     public EmailClient() {
@@ -104,17 +106,26 @@ public class EmailClient extends JFrame {
         getAttachBtn.addActionListener(this::getAttachmentListener);
         getAttachBtn.setBounds(680, 125, 130, 45);
 
-        l1 = new DefaultListModel<>();
-        inboxArea = new JList<>(l1);
+        amountOfEmailsToShowLabel = new JLabel("Emails to show");
+        amountOfEmailsToShowLabel.setBounds(815,125,100,20);
+        add(amountOfEmailsToShowLabel);
+
+
+        amountToShowBox = new JComboBox(amountToShow);
+        amountToShowBox.setBounds(815, 150, 85,20);
+        add(amountToShowBox);
+
+        defaultListModel = new DefaultListModel<>();
+        inboxArea = new JList<>(defaultListModel);
         scrollPane = new JScrollPane(inboxArea);
         scrollPane.setPreferredSize(new Dimension(400, 110));
-        scrollPane.setBounds(410, 180, 400, 120);
+        scrollPane.setBounds(410, 180, 500, 120);
 
 
         readEmailArea = new JTextArea();
         readEmailArea.setLineWrap(true);
         scrollReadEmail = new JScrollPane(readEmailArea);
-        scrollReadEmail.setBounds(410, 310, 400, 220);
+        scrollReadEmail.setBounds(410, 310, 500, 220);
 
         //-----------------INBOX AREA END----------------------
 
@@ -189,7 +200,6 @@ public class EmailClient extends JFrame {
         return inboxArea;
     }
 
-
     // Metod som gör det möjligt att bla skriva i email fönstret
     public void enableEmail() {
         sendBtn.setEnabled(true);
@@ -226,7 +236,7 @@ public class EmailClient extends JFrame {
         signInOutBtn.setText("Sign in");
         attachmentLabel.setText("Attachments: ");
         messeageArea.append("");
-        l1.removeAllElements();
+        defaultListModel.removeAllElements();
         totalAmountLabel.setText("");
         unreadLabel.setText("");
         setDownloadStatusLabel("-");
@@ -274,7 +284,7 @@ public class EmailClient extends JFrame {
                     return new PasswordAuthentication(username, password);
                 }
             });
-            emailReceiver = new EmailReceiver(this, username, password, l1);
+            emailReceiver = new EmailReceiver(this, username, password, defaultListModel);
             toggleSignInOut();
             enableEmail();
             refreshBtn.setEnabled(true);
@@ -341,6 +351,7 @@ public class EmailClient extends JFrame {
             return true;
         }
     }
+
     // Metod som sparar den valda filen.
     public void getChosenFile(MimeBodyPart part) {
         int result = fileChooser.showSaveDialog(fileChooser);
@@ -354,6 +365,7 @@ public class EmailClient extends JFrame {
             }
         }
     }
+
     // Lyssanre för knappen "Refresh".
     public void refreshListener(ActionEvent e) {
         emailReceiver.refresh();
@@ -365,15 +377,13 @@ public class EmailClient extends JFrame {
     public void readListener(ActionEvent e) {
         Email email = inboxArea.getSelectedValue();
         writeEmail(email);
-
-
     }
 
     /* Metod som hämtar de valda mailet, dess MimeBodyPart,
     *  och kollar om det finns en attachment. */
     public void getAttachmentListener(ActionEvent e) {
         Email email = inboxArea.getSelectedValue();
-        MimeBodyPart part = email.getAttachemtPart();
+        MimeBodyPart part = email.getAttachmentPart();
         setDownloadStatusLabel("Fetching attachment..");
 
         boolean hasAttachment = checkAttachmentAmount(email);
@@ -400,6 +410,13 @@ public class EmailClient extends JFrame {
     // Metod som uppdaterar en JLabel
     public void setDownloadStatusLabel(String msg) {
         downloadStatusLabel.setText("Download status: " + msg);
+    }
+
+    // Metod som returnerar värdet i comboboxen för antal mail att visa
+    public int getSelectedAmountOfEmails(){
+        String selectedAmountString = (String) amountToShowBox.getSelectedItem();
+        int selectedAmount = Integer.parseInt(selectedAmountString);
+        return selectedAmount - 1;
     }
 
     // Main
@@ -471,6 +488,8 @@ class EmailSender extends Thread {
             emailClient.setSentStatusLabel("Something went wrong, try again.");
         }
     }
+
+
 
     // Metod som uppdaterar en JLabel
     public void setSuccessMsg() {
@@ -628,6 +647,12 @@ class EmailReceiver {
         }
     }
 
+    /* Metod som hämtar texten från ett mail
+    *  om contenttypen är "text/plain",
+    *  annars kallar den på ytterliggare en metod.
+    *
+    *  Returnerar mailet i textfrom, oavsett om det
+    *  är multipart eller inte. */
     public String getTextFromEmail(Message msg) throws MessagingException, IOException {
         String result = "";
         if (msg.isMimeType("text/plain")) {
@@ -639,6 +664,15 @@ class EmailReceiver {
         return result;
     }
 
+    /* Metod som hämtar texten från multipartmail
+    *  om multiplart delen är text/plain, så returneras
+    *  texten i multiparten
+    *
+    *  Om multiparten är text/html så returneras htmldelen
+    *  fast som ren text
+    *
+    *  Om multiparten har fler multiparts i sig så kallar
+    *  metoden på sig själv och börjar om från start. */
     public String getTextFromMimeMultipart(MimeMultipart mimeMultipart) throws MessagingException, IOException {
         String result = "";
         int count = mimeMultipart.getCount();
@@ -658,16 +692,20 @@ class EmailReceiver {
         return result;
     }
 
+    // Metod som hämtar Brevlådan för den inloggade användaren
     public synchronized void fetchEmails() {
         try {
             Properties properties = new Properties();
             properties.put("mail.smtp.host", "smtp-mail.outlook.com");
+            // Skapar en ny session med username och lösenord.
             Session session = Session.getInstance(properties, new Authenticator() {
                 @Override
                 protected PasswordAuthentication getPasswordAuthentication() {
                     return new PasswordAuthentication(username, password);
                 }
             });
+
+
             Store emailStore = session.getStore("imaps");
             emailStore.connect("smtp-mail.outlook.com", username, password);
 
@@ -684,8 +722,10 @@ class EmailReceiver {
             clearTextArea();
 
 
+
+            int selectedAmount = emailClient.getSelectedAmountOfEmails();
             for (int i = 0; i < messages.length; i++) {
-                if (i > 10) {
+                if (i > selectedAmount) {
                     break;
                 }
                 getEmailContent(messages[i]);
@@ -707,12 +747,14 @@ class ConstantRefresher extends Thread {
     private EmailClient emailClient;
     private boolean alive = true;
 
+    // Konstruktor för klassen ConstantRefresher
     public ConstantRefresher(EmailReceiver emailReceiver, EmailClient emailClient) {
         this.emailClient = emailClient;
         this.emailReceiver = emailReceiver;
         start();
     }
 
+    // Run-metod för klassen, vilar i 1 min och uppdaterar sen inboxen.
     public void run() {
         while (alive) {
             try {
@@ -739,6 +781,7 @@ class Email {
     private MimeBodyPart attachemtPart;
     private HashMap<String, MimeBodyPart> attachments;
 
+    //Konstruktor för klassen Email
     public Email(String from, String subject, String date, String attachment, String message, MimeBodyPart part, DefaultListModel defaultListModel, HashMap<String, MimeBodyPart> attachments) {
         this.from = from;
         this.subject = subject;
@@ -750,30 +793,38 @@ class Email {
         this.attachments = attachments;
     }
 
+    /* Metod som lägger till ett email (this)
+    *  i vår defaultListModel*/
     public void add() {
         defaultListModel.addElement(this);
     }
 
-    public MimeBodyPart getAttachemtPart() {
+    /* Metod som returnerar ett mails bilaga */
+    public MimeBodyPart getAttachmentPart() {
         return attachemtPart;
     }
 
+    /* Metod som returnerar en bilagas namn */
     public String getAttachmentName() {
         return attachmentName.trim();
     }
 
+    /* Metod som returnerar ett mails meddelande */
     public String getMessage() {
         return message;
     }
 
+    /* ToString metod */
     public String toString() {
         return "Subject: " + subject + " From:" + from;
     }
 
+    /* Metod som returnerar ett mails hashmap med bilagor */
     public HashMap getHashMap() {
         return attachments;
     }
 
+    /* Metod som returnerar ett mails datum */
     public String getDate() {
         return date;
     }
